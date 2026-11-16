@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>คืนวันศุกร์ที่ 13</title>
+<style>
+:root{font-family:system-ui,"Leelawadee UI",Tahoma,sans-serif;color:#f4f5fa;background:#0a0709;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:clamp(16px,4vw,56px);background:radial-gradient(ellipse at 83% 22%,#3a1218 0%,transparent 52%),#0a0709}
+.game{--accent:#ff8a7a;--glow:#5a1a1f;width:min(100%,1120px);display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);border:1px solid #4d3036;border-radius:28px;overflow:hidden;background:#171014;box-shadow:0 28px 80px #000a}
+.game[data-tone="win"]{--accent:#a8edc3;--glow:#245340}
+.game[data-tone="lose"]{--accent:#ff4d4d;--glow:#730d12}
+.game[data-tone="twist"]{--accent:#c9a0ff;--glow:#43285f}
+.game.shake{animation:shake .45s}
+@keyframes shake{20%{transform:translate(-7px,3px)}40%{transform:translate(6px,-4px)}60%{transform:translate(-4px,2px)}80%{transform:translate(3px,-2px)}}
+@media (prefers-reduced-motion:reduce){.game.shake{animation:none}}
+.story{padding:clamp(24px,5vw,64px)}
+.location{margin:0 0 14px;color:var(--accent);font-weight:750;font-size:clamp(.95rem,1.65vw,1.125rem)}
+h1{margin:0;max-width:16ch;font-size:clamp(2rem,4.5vw,4.125rem);line-height:1.25;overflow-wrap:anywhere}
+.description{min-height:7.5em;margin:16px 0 24px;color:#e0d6d8;font-size:clamp(1.02rem,1.9vw,1.25rem);line-height:1.7}
+.choices{display:grid;gap:12px}
+button{font:inherit;font-weight:700;font-size:clamp(1rem,1.8vw,1.15rem);text-align:left;color:#f4f5fa;padding:13px 16px;min-height:54px;border:1px solid #6a4a52;border-radius:12px;background:#2a1b20;cursor:pointer}
+.choice{display:flex;align-items:center;gap:12px}
+.choice b{flex:0 0 32px;line-height:32px;text-align:center;border-radius:6px;background:#12090c;color:var(--accent)}
+button:hover{background:#432a31;border-color:var(--accent)}
+button:focus-visible,h1:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+.restart{background:var(--accent);border-color:var(--accent);color:#171b24}
+.restart:hover{background:#f4f5fa}
+.status{display:grid;place-items:center;padding:clamp(20px,4vw,44px);border-inline-start:1px solid #4d3036;background:radial-gradient(ellipse at center,var(--glow),transparent 69%),repeating-linear-gradient(0deg,transparent 0 31px,#c8899320 31px 32px),repeating-linear-gradient(90deg,transparent 0 31px,#c8899320 31px 32px),#120c0f}
+.panel{width:min(100%,250px);min-height:292px;display:grid;align-content:center;gap:16px;margin:0;padding:24px;border:5px solid #6a4a52;border-radius:32px;background:#150d10;box-shadow:0 0 54px #000b}
+.panel dt{color:#e0d6d8;font-size:1rem}
+.panel dd{margin:1px 0 0;font-size:clamp(1.2rem,2.4vw,1.6rem);font-weight:750}
+#survivors{color:var(--accent);font-size:clamp(2.4rem,5.5vw,4rem);line-height:1.12}
+.panel div+div{padding-top:12px;border-top:1px solid #5a3d45}
+@media (max-width:700px){
+.game{grid-template-columns:1fr;border-radius:18px}
+.status{grid-row:1;padding:12px;border-inline-start:0;border-bottom:1px solid #4d3036}
+.panel{grid-template-columns:1fr 1fr;width:100%;min-height:0;gap:12px;padding:10px 14px;border-width:1px;border-radius:12px}
+.panel div+div{border-top:0;border-inline-start:1px solid #5a3d45;padding:0 0 0 12px}
+.panel dd,#survivors{font-size:1.2rem;line-height:1.3}
+.description{min-height:0}
+}
+</style>
+</head>
+<body>
+<main class="game" id="game">
+<section class="story" aria-labelledby="scene-title">
+<p class="location" id="location"></p>
+<h1 id="scene-title" tabindex="-1"></h1>
+<p class="description" id="description" aria-live="polite"></p>
+<div class="choices" id="choices"></div>
+<button class="restart" id="restart" type="button" hidden>เล่นใหม่</button>
+</section>
+<aside class="status" aria-label="สถานะผู้รอดชีวิตและเวลาถึงรุ่งสาง">
+<dl class="panel">
+<div><dt>ผู้รอดชีวิต</dt><dd id="survivors"></dd></div>
+<div><dt>เวลาถึงรุ่งสาง</dt><dd id="time"></dd></div>
+</dl>
+</aside>
+</main>
+<script>
+// l=ข้อความปุ่ม to=ฉากถัดไป s=ผู้รอดชีวิตเปลี่ยน t=เวลาที่เสียไป(นาที) f=ได้ของ need=ต้องมีของ else=ถ้าไม่มี
+const S={
+start:{loc:'แคมป์ครีสตัลเลค',title:'คืนวันศุกร์ที่ 13',
+d:'คุณและเพื่อนอีก 4 คน (Bill, Ned, Marcie, Brenda) มาเปิดค่ายฤดูร้อนริมทะเลสาบที่ปิดร้างมา 20 ปี หมอกลงหนาตั้งแต่หัวค่ำ ชายแก่ถือถุงเก่าๆ ยืนขวางทางเข้า เสียงสั่นเครือเตือนว่า “ที่นี่ถูกสาป ออกไปเสียก่อนมืด” เพื่อนๆ หัวเราะ แต่แววตาแกไม่ได้ล้อเล่น',
+c:[{l:'ถามแกว่าเกิดอะไรขึ้นที่นี่',to:'camp',t:120},{l:'ไม่สนใจ เดินเข้าค่ายไปก่อน',to:'camp',t:80}]},
+camp:{loc:'ลานกองไฟ',title:'ไฟกะพริบ',
+d:'ไฟในค่ายกะพริบแล้วดับวูบ เหลือแค่แสงกองไฟ Bill เล่าเรื่องเด็กชายที่จมน้ำตายในทะเลสาบเมื่อ 20 ปีก่อน ทุกคนหัวเราะเสียงแห้ง ทันใดนั้นมีเสียงโลหะกระแทกดังขึ้นพร้อมกันจากสองทิศ ทั้งจากโรงปั่นไฟหลังบ้านพักและจากท่าเรือเก่า',
+c:[{l:'ไปดูโรงปั่นไฟกับ Bill',to:'gen',s:-1,t:100},{l:'ไปดูท่าเรือกับ Ned',to:'dock',s:-1,t:100}]},
+gen:{loc:'โรงปั่นไฟ',title:'ใบมีดในความมืด',
+d:'Bill ก้มเปิดฝาเครื่องปั่นไฟ ร่างสูงใหญ่ในหน้ากากฮอกกี้ก้าวออกมาจากมุมมืดโดยไม่มีเสียง มีดพร้าฟาดลงกลางหลัง Bill เสียงกระดูกแตกสะท้อนก้อง เลือดอุ่นๆ สาดเต็มหน้าคุณ Jason เงยหน้าสบตาคุณ แล้วดึงมีดออกช้าๆ พร้อมก้าวเข้ามา',
+c:[{l:'วิ่งเข้าป่า',to:'forest',s:-1,t:80},{l:'วิ่งกลับบ้านพัก ล็อกประตู',to:'cabin',s:-1,t:80}]},
+dock:{loc:'ท่าเรือเก่า',title:'ผู้ที่ขึ้นมาจากน้ำ',
+d:'Ned ก้าวไปบนไม้ผุ แล้วมือใหญ่เปื้อนโคลนคว้าข้อเท้าเขาจากใต้ท่า ร่างของ Ned ถูกลากลงน้ำเสียงดังสนั่น ก่อนใบมีดจะแทงทะลุแผ่นไม้ขึ้นมา เลือดพุ่งผ่านช่องว่างเปื้อนรองเท้าคุณ ร่างสูงใหญ่ใต้หน้ากากปีนขึ้นจากทะเลสาบ เขาไม่รีบ เพราะรู้ว่าคุณหนีไม่พ้น',
+c:[{l:'วิ่งเข้าป่า',to:'forest',s:-1,t:80},{l:'วิ่งกลับบ้านพัก ล็อกประตู',to:'cabin',s:-1,t:80}]},
+forest:{loc:'ป่าทึบ',title:'วิ่งให้พ้นมีด',
+d:'กิ่งไม้ฉีกแขนคุณเป็นแผลยาว เสียงฝีเท้าหนักๆ ตามหลังมาไม่ห่าง Marcie สะดุดรากไม้ล้มลง เธอเอื้อมมือหาคุณก่อนใบมีดจะฟาดลงมา เสียงกรีดร้องขาดห้วน เลือดกระเซ็นไปทั่วใบไม้ ข้างหน้าเห็นกระท่อมเครื่องมือและเรือเล็กผูกอยู่ริมน้ำ',
+c:[{l:'เข้ากระท่อมคว้าขวาน',to:'split',f:'axe',t:60},{l:'ลงเรือเล็กริมน้ำ',to:'split',f:'boat',t:60}]},
+cabin:{loc:'บ้านพักหลัก',title:'ประตูที่กำลังจะพัง',
+d:'คุณลั่นกลอนและดันตู้ไม้ขวางประตู แต่ใบมีดฟาดทะลุบานไม้ทีละครั้ง เศษไม้ปลิวกระจาย Brenda ถอยไปติดหน้าต่าง มือใหญ่ยื่นผ่านช่องแตกคว้าผมเธอแล้วกระชากออกไป เสียงร้องหยุดกะทันหัน ก่อนเสียงฝีเท้าอ้อมไปที่ประตูหลัง',
+c:[{l:'ทุบกระจกหนีไปกระท่อมเครื่องมือ คว้าขวาน',to:'split',f:'axe',t:60},{l:'วิ่งออกประตูหลัง ลงเรือเล็กริมน้ำ',to:'split',f:'boat',t:60}]},
+split:{loc:'ริมทะเลสาบ',title:'จุดแยกทาง',
+d:'ไฟจากบ้านพักที่ลุกไหม้ทอดเงายาวบนผิวน้ำ ขอบฟ้าเริ่มซีดแต่ยังไม่สว่าง เหลือเพื่อนสองคนข้างกายคุณ ทุกคนบาดเจ็บและหอบหายใจ ทางไปท่าเรือใหญ่มีสองเส้น ทางโล่งเร็วแต่ถูกเห็นง่าย กับทางป่าที่ซ่อนตัวได้แต่ช้าและมืด',
+c:[{l:'อยู่รวมกัน เดินทางโล่งไปด้วยกัน',to:'fight',t:60},{l:'ให้เพื่อนคนหนึ่งล่อเขาเข้าป่า ที่เหลือไปทางโล่ง',to:'fight',s:-1,t:20}]},
+fight:{loc:'ลานหน้าท่าเรือใหญ่',title:'เขายังไม่ตาย',
+d:'Jason ยืนรออยู่ก่อนแล้ว เสื้อชุ่มเลือดและโคลน หน้ากากแตกร้าวเป็นทาง เขาไม่วิ่ง แต่เดินเข้ามาช้าๆ ลากมีดพร้าไปบนพื้นไม้จนเสียงเสียดหู ระยะห่างเหลือไม่ถึงสิบก้าว ถึงเวลาที่ต้องเลือกแล้ว',
+c:[{l:'ฟันสู้ด้วยขวาน (ต้องมีขวาน)',to:'final',need:'axe',else:'end_all',s:-1,t:20},{l:'ล่อเขาให้เหยียบพื้นไม้ผุของท่าเรือเก่า',to:'final',t:40},{l:'วิ่งไปลงเรือทันที (ต้องมีเรือ)',to:'final',need:'boat',else:'end_all',t:30}]},
+final:{loc:'ปลายท่าเรือ',title:'ร่างที่ล้มลง',
+d:'เสียงไม้พังดังสนั่น Jason ล้มลงกลางท่าเรือ มีดหลุดมือกระเด็นตกน้ำ ร่างใหญ่นิ่งสนิทท่ามกลางเลือดและไม้ผุ ฟ้าทางตะวันออกเริ่มเป็นสีเทาเงิน เพื่อนที่เหลือจ้องมาที่คุณ หอบหายใจ ใครสักคนต้องตัดสินใจเดี๋ยวนี้',
+c:[{l:'ลากร่างลงทะเลสาบให้จม แล้วรอตำรวจ',to:'end_twist'},{l:'ทิ้งเขาไว้ แล้วรีบหนีออกจากค่าย',to:'end_escape',need:'boat',else:'end_all'},{l:'กลับเข้าป่าไปหาเพื่อนที่อาจยังหายใจอยู่',to:'end_all'}]},
+end_all:{loc:'จบ 1',tone:'lose',zero:1,timeText:'ไม่มีใครถึงเช้า',title:'โดนเก็บเรียบ',
+d:'เสียงกรีดร้องสุดท้ายหายไปในหมอก ใบมีดพร้าฟาดลงครั้งแล้วครั้งเล่าจนเลือดไหลเป็นทางผ่านรอยไม้ลงสู่ทะเลสาบ ไม่เหลือใครให้หนี ตอนเช้ารถตำรวจมาถึงค่ายที่เงียบสนิท เห็นเพียงรอยลากเลือดยาวไปถึงท่าเรือ และหน้ากากฮอกกี้ลอยอยู่กลางผิวน้ำ'},
+end_escape:{loc:'จบ 2',tone:'win',dawn:1,title:'แสงแรกของวัน',
+d:'เรือเล็กแหวกหมอกข้ามทะเลสาบ มือคุณสั่นจนไม้พายแทบหลุด เสื้อเปียกทั้งเลือดและโคลน ฝั่งตรงข้ามคือถนนและแสงแรกของเช้า ตำรวจพบพวกคุณ เหลือเพียงคุณกับเพื่อนไม่กี่คนที่รอด ทุกคนร้องไห้โดยไม่มีเสียง และรู้ว่าจะไม่มีวันลืมคืนนี้'},
+end_twist:{loc:'จบ 3',tone:'twist',dawn:1,title:'มือใต้น้ำ',
+d:'คุณลากร่างนิ่งนั้นลงน้ำ ฟองอากาศสุดท้ายผุดขึ้นแล้วหายไป รุ่งสางมาพร้อมเสียงไซเรนตำรวจ แต่เมื่อนักดำน้ำค้นหา ใต้ทะเลสาบกลับว่างเปล่า มีเพียงหน้ากากลอยอยู่ ขณะคุณเล่าเรื่องให้ตำรวจฟัง มือซีดเปื้อนโคลนก็ค่อยๆ โผล่ขึ้นจากผิวน้ำเบื้องหลังคุณ'}
+};
+const $=id=>document.getElementById(id);
+const game=$('game'),box=$('choices'),restart=$('restart');
+let st,cur;
+const fmt=t=>t<=0?'รุ่งสางแล้ว':'เหลือ '+Math.floor(t/60)+' ชม. '+t%60+' นาที';
+function show(id){
+  const sc=S[id],prev=st.s;
+  cur=sc;
+  if(sc.zero)st.s=0;
+  if(sc.dawn)st.t=0;
+  $('location').textContent=sc.loc;
+  $('scene-title').textContent=sc.title;
+  $('description').textContent=sc.d;
+  $('survivors').textContent=st.s+'/5';
+  $('time').textContent=sc.timeText||fmt(st.t);
+  game.dataset.tone=sc.tone||'';
+  game.classList.remove('shake');
+  if(st.s<prev){void game.offsetWidth;game.classList.add('shake');}
+  box.textContent='';
+  (sc.c||[]).forEach((c,i)=>{
+    const b=document.createElement('button');
+    b.type='button';b.className='choice';
+    const k=document.createElement('b');k.setAttribute('aria-hidden','true');k.textContent='ABC'[i];
+    const sp=document.createElement('span');sp.textContent=c.l;
+    b.append(k,sp);
+    b.addEventListener('click',()=>go(c));
+    box.append(b);
+  });
+  box.hidden=!sc.c;
+  restart.hidden=!!sc.c;
+  $('scene-title').focus();
+}
+function go(c){
+  let id=c.to;
+  if(c.need&&!st.f[c.need])id=c.else;
+  st.s=Math.max(0,st.s+(c.s||0));
+  st.t=Math.max(0,st.t-(c.t||0));
+  if(c.f)st.f[c.f]=1;
+  show(id);
+}
+function reset(){st={s:5,t:540,f:{}};show('start');}
+restart.addEventListener('click',reset);
+reset();
+</script>
+</body>
+</html>

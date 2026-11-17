@@ -62,6 +62,7 @@ button:focus-visible,h1:focus-visible{outline:3px solid var(--accent);outline-of
 </aside>
 </main>
 <script>
+// ===== ข้อมูลเนื้อเรื่อง (คงต้นฉบับทุกตัวอักษร) =====
 // l=ข้อความปุ่ม to=ฉากถัดไป s=ผู้รอดชีวิตเปลี่ยน t=เวลาที่เสียไป(นาที) f=ได้ของ need=ต้องมีของ else=ถ้าไม่มี
 const S={
 start:{loc:'แคมป์ครีสตัลเลค',title:'คืนวันศุกร์ที่ 13',
@@ -98,48 +99,180 @@ d:'เรือเล็กแหวกหมอกข้ามทะเลส�
 end_twist:{loc:'จบ 3',tone:'twist',dawn:1,title:'มือใต้น้ำ',
 d:'คุณลากร่างนิ่งนั้นลงน้ำ ฟองอากาศสุดท้ายผุดขึ้นแล้วหายไป รุ่งสางมาพร้อมเสียงไซเรนตำรวจ แต่เมื่อนักดำน้ำค้นหา ใต้ทะเลสาบกลับว่างเปล่า มีเพียงหน้ากากลอยอยู่ ขณะคุณเล่าเรื่องให้ตำรวจฟัง มือซีดเปื้อนโคลนก็ค่อยๆ โผล่ขึ้นจากผิวน้ำเบื้องหลังคุณ'}
 };
-const $=id=>document.getElementById(id);
-const game=$('game'),box=$('choices'),restart=$('restart');
-let st,cur;
-const fmt=t=>t<=0?'รุ่งสางแล้ว':'เหลือ '+Math.floor(t/60)+' ชม. '+t%60+' นาที';
-function show(id){
-  const sc=S[id],prev=st.s;
-  cur=sc;
-  if(sc.zero)st.s=0;
-  if(sc.dawn)st.t=0;
-  $('location').textContent=sc.loc;
-  $('scene-title').textContent=sc.title;
-  $('description').textContent=sc.d;
-  $('survivors').textContent=st.s+'/5';
-  $('time').textContent=sc.timeText||fmt(st.t);
-  game.dataset.tone=sc.tone||'';
-  game.classList.remove('shake');
-  if(st.s<prev){void game.offsetWidth;game.classList.add('shake');}
-  box.textContent='';
-  (sc.c||[]).forEach((c,i)=>{
-    const b=document.createElement('button');
-    b.type='button';b.className='choice';
-    const k=document.createElement('b');k.setAttribute('aria-hidden','true');k.textContent='ABC'[i];
-    const sp=document.createElement('span');sp.textContent=c.l;
-    b.append(k,sp);
-    b.addEventListener('click',()=>go(c));
-    box.append(b);
-  });
-  box.hidden=!sc.c;
-  restart.hidden=!!sc.c;
-  $('scene-title').focus();
+
+// ===== ตัวแปรเก็บสถานะของเกม =====
+let survivors = 5;       // ผู้รอดชีวิต
+let minutesLeft = 540;   // เวลาถึงรุ่งสาง (นาที) = 9 ชั่วโมง
+let hasAxe = false;      // มีขวานหรือยัง
+let hasBoat = false;     // มีเรือหรือยัง
+let currentScene = null;
+
+// ===== เลือกองค์ประกอบด้วย DOM =====
+const game = document.querySelector('#game');
+const locationText = document.querySelector('#location');
+const sceneTitle = document.querySelector('#scene-title');
+const description = document.querySelector('#description');
+const box = document.querySelector('#choices');
+const restart = document.querySelector('#restart');
+const survivorsText = document.querySelector('#survivors');
+const timeBox = document.querySelector('#time');
+
+// ===== ฟังก์ชัน =====
+
+// แปลงจำนวนนาทีเป็นข้อความ เช่น 540 -> เหลือ 9 ชม. 0 นาที
+function formatTime(minutes) {
+  if (minutes <= 0) {
+    return 'รุ่งสางแล้ว';
+  }
+  const rest = minutes % 60;
+  const hours = (minutes - rest) / 60;
+  return 'เหลือ ' + hours + ' ชม. ' + rest + ' นาที';
 }
-function go(c){
-  let id=c.to;
-  if(c.need&&!st.f[c.need])id=c.else;
-  st.s=Math.max(0,st.s+(c.s||0));
-  st.t=Math.max(0,st.t-(c.t||0));
-  if(c.f)st.f[c.f]=1;
-  show(id);
+
+// ตรวจว่ามีของชิ้นนั้นหรือยัง ('axe' หรือ 'boat')
+function hasItem(name) {
+  if (name === 'axe') {
+    return hasAxe;
+  }
+  if (name === 'boat') {
+    return hasBoat;
+  }
+  return false;
 }
-function reset(){st={s:5,t:540,f:{}};show('start');}
-restart.addEventListener('click',reset);
-reset();
+
+// เก็บของเข้ากระเป๋า
+function giveItem(name) {
+  if (name === 'axe') {
+    hasAxe = true;
+  }
+  if (name === 'boat') {
+    hasBoat = true;
+  }
+}
+
+// สร้างปุ่มตัวเลือกทั้งหมดของฉาก ด้วยการวนลูปอ่านข้อมูลใน array
+function createChoiceButtons(scene) {
+  const letters = ['A', 'B', 'C'];
+  box.textContent = '';
+  for (let i = 0; i < scene.c.length; i++) {
+    const option = scene.c[i];
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'choice';
+
+    const letter = document.createElement('b');
+    letter.setAttribute('aria-hidden', 'true');
+    letter.textContent = letters[i];
+
+    const label = document.createElement('span');
+    label.textContent = option.l;
+
+    button.appendChild(letter);
+    button.appendChild(label);
+    button.addEventListener('click', function () {
+      chooseOption(option);
+    });
+    box.appendChild(button);
+  }
+}
+
+// แสดงฉากบนหน้าเว็บ
+function showScene(id) {
+  const scene = S[id];
+  const survivorsBefore = survivors;
+  currentScene = scene;
+
+  if (scene.zero) {
+    survivors = 0;           // ฉากจบแบบไม่มีใครรอด
+  }
+  if (scene.dawn) {
+    minutesLeft = 0;         // ฉากจบที่ถึงรุ่งสาง
+  }
+
+  // ใช้ Console ตรวจค่าตัวแปร (กด F12 แล้วเปิดแท็บ Console)
+  console.log('ฉาก:', id, '| ผู้รอดชีวิต:', survivors, '| เวลา(นาที):', minutesLeft, '| ขวาน:', hasAxe, '| เรือ:', hasBoat);
+
+  locationText.textContent = scene.loc;
+  sceneTitle.textContent = scene.title;
+  description.textContent = scene.d;
+  survivorsText.textContent = survivors + '/5';
+
+  if (scene.timeText) {
+    timeBox.textContent = scene.timeText;
+  } else {
+    timeBox.textContent = formatTime(minutesLeft);
+  }
+
+  // CSS เดิมเปลี่ยนสีตาม data-tone
+  if (scene.tone) {
+    game.dataset.tone = scene.tone;
+  } else {
+    game.dataset.tone = '';
+  }
+
+  // ถ้าผู้รอดชีวิตลดลง ให้จอสั่น (class shake อยู่ใน CSS เดิม)
+  game.className = 'game';
+  if (survivors < survivorsBefore) {
+    const reflow = game.offsetWidth;   // อ่านค่านี้เพื่อให้แอนิเมชันเริ่มใหม่ทุกครั้ง
+    game.className = 'game shake';
+  }
+
+  // ฉากที่มีตัวเลือก: สร้างปุ่ม / ฉากจบ: แสดงปุ่มเล่นใหม่
+  if (scene.c) {
+    createChoiceButtons(scene);
+    box.hidden = false;
+    restart.hidden = true;
+  } else {
+    box.textContent = '';
+    box.hidden = true;
+    restart.hidden = false;
+  }
+  sceneTitle.focus();
+}
+
+// เมื่อผู้เล่นกดเลือกตัวเลือกหนึ่ง
+function chooseOption(option) {
+  let nextId = option.to;
+
+  // ถ้าตัวเลือกต้องใช้ของ แต่ไม่มี ให้ไปฉากอื่นแทน
+  if (option.need) {
+    if (hasItem(option.need) === false) {
+      nextId = option.else;
+    }
+  }
+
+  if (option.s) {
+    survivors = survivors + option.s;
+    if (survivors < 0) {
+      survivors = 0;
+    }
+  }
+  if (option.t) {
+    minutesLeft = minutesLeft - option.t;
+    if (minutesLeft < 0) {
+      minutesLeft = 0;
+    }
+  }
+  if (option.f) {
+    giveItem(option.f);
+  }
+
+  showScene(nextId);
+}
+
+function startGame() {
+  survivors = 5;
+  minutesLeft = 540;
+  hasAxe = false;
+  hasBoat = false;
+  showScene('start');
+}
+
+// ===== Events =====
+restart.addEventListener('click', startGame);
+
+startGame();
 </script>
 </body>
 </html>
